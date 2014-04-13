@@ -36,8 +36,8 @@ class DropSizeDistribution(object):
     def calc_radar_parameters(self, wavelength=tmatrix_aux.wl_X):
         '''
         Calculates the radar parameters and stores them in the object.
-        Defaults to X-Band,Beard and Chuang setup. 
-        
+        Defaults to X-Band,Beard and Chuang setup.
+
         Sets object radar parameters:
             Zh, Zdr, Kdp, Ai
 
@@ -94,3 +94,40 @@ class DropSizeDistribution(object):
         popt, pcov = expfit(np.power(10, 0.1 * self.Zh[self.rain_rate > 0]),
                             self.rain_rate[self.rain_rate > 0])
         return popt, pcov
+
+    def _calc_median_drop_diameter(self, Nd):
+        try:
+            self.diameter
+            self.spread
+        except:
+            print('Either the diameter or spread is not set and so this operation will not work')
+
+        rho_w=1
+
+        cum_W = 10**-3 * np.pi/6 * rho_w * \
+                np.cumsum([Nd[k]*self.spread[k]*(self.diameter[k]**3) for k in range(0,len(Nd))])
+        cross_pt = list(cum_W<(cum_W[-1]*0.5)).index(False)-1
+        slope = (cum_W[cross_pt+1]-cum_W[cross_pt])/(self.diameter[cross_pt+1]-self.diameter[cross_pt])
+        run = (0.5*cum_W[-1]-cum_W[cross_pt])/slope
+        return self.diameter[cross_pt]+run
+
+    def _calc_liquid_water_content(self,Nd):
+        rho_w = 1
+        return 10e-03 * np.pi/6 * rho_w * np.dot(np.multiply(Nd,
+                             self.spread), np.array(self.diameter)**3)
+
+    def _calc_Nt(self,Nd):
+        return np.dot(self.spread,Nd)
+
+    def _calc_Dn(self,Nd,n):
+        return np.dot(np.multiply(self.spread,Nd), np.array(self.diameter)**n)
+
+    def _calc_Dm(self,Nd):
+        return self._calc_Dn(Nd,4)/self._calc_Dn(Nd,3)
+
+
+    def _calc_Nw(self,Nd):
+        return (3.67**4)/np.pi * (10**3 * self._calc_liquid_water_content(Nd))/ \
+            (self._calc_median_drop_diameter(Nd)**4)
+
+
